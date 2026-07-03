@@ -1,0 +1,24 @@
+# ============================================================
+#  NutriAI Agent — Python Dependencies
+#  Tested with Python 3.12 – 3.14
+# ============================================================
+
+# --- Build tooling (must come first; restores pkg_resources on Python 3.12+) ---
+setuptools>=75.0.0
+
+# --- Core Framework ---
+flask==3.0.3
+flask-cors==4.0.1
+
+# --- Environment & Config ---
+python-dotenv==1.0.1
+
+# --- IBM Watsonx.ai SDK ---
+ibm-watsonx-ai==1.5.14
+ibm-cloud-sdk-core==3.25.0
+
+# --- Data Processing (unpinned; ibm-cloud-sdk-core 3.25 requires >=2.32.4) ---
+requests>=2.32.4
+
+# --- Optional: WSGI server for production (Linux/macOS only) ---
+# gunicorn==22.0.0

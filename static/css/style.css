@@ -1,0 +1,901 @@
+/* ============================================================
+   NutriAI Agent — Custom Stylesheet
+   File: static/css/style.css
+============================================================ */
+
+/* ---- Google Fonts imported in HTML ---- */
+
+/* ============================================================
+   CSS VARIABLES — Light & Dark Mode
+============================================================ */
+:root {
+  --nutriai-primary:     #2ecc87;
+  --nutriai-primary-dark:#1fa86d;
+  --nutriai-secondary:   #3b5bdb;
+  --nutriai-accent:      #ff6b6b;
+  --nutriai-warning:     #ffa726;
+
+  --bg-body:             #f0f4f8;
+  --bg-card:             #ffffff;
+  --bg-card-header:      #f7f9fc;
+  --bg-sidebar:          #f7f9fc;
+  --border-color:        #e2e8f0;
+  --text-primary:        #1a202c;
+  --text-secondary:      #4a5568;
+  --text-muted:          #718096;
+  --shadow-sm:           0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:           0 4px 12px rgba(0,0,0,.1);
+  --shadow-lg:           0 10px 30px rgba(0,0,0,.12);
+
+  --navbar-bg:           linear-gradient(135deg, #1a1f3c 0%, #2d3561 100%);
+  --hero-bg:             linear-gradient(135deg, #1a1f3c 0%, #2d3561 60%, #1e4a3e 100%);
+  --chat-user-bg:        linear-gradient(135deg, #2ecc87, #1fa86d);
+  --chat-ai-bg:          var(--bg-card);
+
+  --tab-active-bg:       var(--bg-card);
+  --tab-inactive-bg:     #edf2f7;
+
+  --radius-sm:           8px;
+  --radius-md:           12px;
+  --radius-lg:           18px;
+  --radius-xl:           24px;
+}
+
+[data-bs-theme="dark"] {
+  --bg-body:             #0f1117;
+  --bg-card:             #1a1d2e;
+  --bg-card-header:      #12151f;
+  --bg-sidebar:          #12151f;
+  --border-color:        #2a2d3e;
+  --text-primary:        #e8eaf6;
+  --text-secondary:      #9fa8c7;
+  --text-muted:          #6b7494;
+  --shadow-sm:           0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:           0 4px 12px rgba(0,0,0,.4);
+  --shadow-lg:           0 10px 30px rgba(0,0,0,.5);
+  --chat-ai-bg:          #1a1d2e;
+  --tab-active-bg:       #1a1d2e;
+  --tab-inactive-bg:     #12151f;
+}
+
+/* ============================================================
+   BASE
+============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-body);
+  color: var(--text-primary);
+  line-height: 1.6;
+  transition: background .3s, color .3s;
+}
+
+/* ============================================================
+   SCROLLBAR (Webkit)
+============================================================ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--nutriai-primary); border-radius: 4px; }
+
+/* ============================================================
+   NAVBAR
+============================================================ */
+.nutriai-navbar {
+  background: var(--navbar-bg);
+  padding: .75rem 0;
+  box-shadow: var(--shadow-md);
+  z-index: 1050;
+}
+
+.brand-icon {
+  width: 40px; height: 40px;
+  background: var(--nutriai-primary);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -.5px;
+}
+
+.brand-tag {
+  font-size: .7rem;
+  font-weight: 500;
+  color: var(--nutriai-primary);
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: rgba(46,204,135,.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.ibm-badge {
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  color: rgba(255,255,255,.85);
+  font-size: .75rem;
+  padding: .3rem .75rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.theme-toggle {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s;
+}
+.theme-toggle:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+/* ============================================================
+   HERO SECTION
+============================================================ */
+.hero-section {
+  background: var(--hero-bg);
+  padding: 3.5rem 0 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse at 80% 50%, rgba(46,204,135,.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 80%, rgba(59,91,219,.12) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center;
+  background: rgba(46,204,135,.15);
+  border: 1px solid rgba(46,204,135,.3);
+  color: var(--nutriai-primary);
+  font-size: .8rem; font-weight: 600;
+  padding: .35rem .9rem; border-radius: 20px;
+  margin-bottom: 1rem;
+  animation: fadeInDown .6s ease;
+}
+
+.hero-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+  animation: fadeInUp .7s ease;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--nutriai-primary), #5ce8ad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  color: rgba(255,255,255,.75);
+  font-size: 1.05rem;
+  max-width: 520px;
+  margin-bottom: 1.75rem;
+  animation: fadeInUp .8s ease;
+}
+
+.hero-stats {
+  display: flex; gap: 2rem;
+  animation: fadeInUp .9s ease;
+}
+
+.stat-item { text-align: center; }
+.stat-number {
+  display: block;
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.6rem; font-weight: 700;
+  color: var(--nutriai-primary);
+}
+.stat-label { font-size: .75rem; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .5px; }
+
+/* Hero Visual */
+.hero-visual {
+  position: relative; height: 280px;
+  animation: fadeIn 1s ease;
+}
+
+.hero-circle {
+  width: 160px; height: 160px;
+  background: radial-gradient(135deg, rgba(46,204,135,.3), rgba(59,91,219,.2));
+  border: 2px solid rgba(46,204,135,.3);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3.5rem; color: var(--nutriai-primary);
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pulse 2.5s infinite;
+}
+
+.nutrition-card-float {
+  position: absolute;
+  background: rgba(255,255,255,.95);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: var(--radius-md);
+  padding: .75rem 1rem;
+  display: flex; align-items: center; gap: .75rem;
+  font-size: .85rem;
+  color: #1a202c;
+  box-shadow: var(--shadow-md);
+  animation: float 3s ease-in-out infinite;
+}
+
+.nutrition-card-float i { font-size: 1.4rem; }
+.nutrition-card-float .fw-bold { font-size: .9rem; }
+.card-1 { top: 5%; left: 5%; animation-delay: 0s; }
+.card-2 { top: 5%; right: 5%; animation-delay: .8s; }
+.card-3 { bottom: 10%; left: 20%; animation-delay: 1.5s; }
+
+/* ============================================================
+   MAIN CONTENT AREA
+============================================================ */
+.main-container {
+  padding: 0 0 3rem;
+}
+
+/* ============================================================
+   TABS
+============================================================ */
+.nutriai-tabs {
+  border: none;
+  gap: .25rem;
+  padding: 1.5rem 0 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.nutriai-tabs::-webkit-scrollbar { display: none; }
+
+.nutriai-tabs .nav-link {
+  border: none !important;
+  border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+  background: var(--tab-inactive-bg);
+  color: var(--text-secondary);
+  font-size: .85rem; font-weight: 500;
+  padding: .65rem 1.2rem;
+  white-space: nowrap;
+  transition: all .2s;
+}
+
+.nutriai-tabs .nav-link:hover {
+  background: var(--bg-card);
+  color: var(--nutriai-primary);
+}
+
+.nutriai-tabs .nav-link.active {
+  background: var(--tab-active-bg);
+  color: var(--nutriai-primary);
+  font-weight: 600;
+  border-bottom: 2px solid var(--nutriai-primary) !important;
+  margin-bottom: -1px;
+}
+
+.nutriai-tab-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================
+   PANEL CARDS
+============================================================ */
+.panel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-card-header {
+  background: var(--bg-card-header);
+  border-bottom: 1px solid var(--border-color);
+  padding: .85rem 1.1rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex; align-items: center;
+}
+
+.panel-card-body {
+  padding: 1rem 1.1rem;
+  overflow-y: auto;
+}
+
+/* ============================================================
+   BUTTONS
+============================================================ */
+.btn-primary-nutriai {
+  background: linear-gradient(135deg, var(--nutriai-primary), var(--nutriai-primary-dark));
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: all .2s;
+  box-shadow: 0 2px 8px rgba(46,204,135,.3);
+}
+.btn-primary-nutriai:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(46,204,135,.4);
+  color: #fff;
+  background: linear-gradient(135deg, var(--nutriai-primary-dark), #178a58);
+}
+.btn-primary-nutriai:active { transform: translateY(0); }
+.btn-primary-nutriai:disabled {
+  opacity: .65; transform: none; cursor: not-allowed;
+}
+
+.btn-quick {
+  background: var(--tab-inactive-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: .78rem;
+  text-align: left;
+  padding: .45rem .75rem;
+  border-radius: var(--radius-sm);
+  transition: all .2s;
+  width: 100%;
+}
+.btn-quick:hover {
+  background: rgba(46,204,135,.1);
+  border-color: var(--nutriai-primary);
+  color: var(--nutriai-primary);
+}
+
+.btn-quick-sm {
+  background: var(--tab-inactive-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: .75rem;
+  padding: .3rem .65rem;
+  border-radius: 20px;
+  transition: all .2s;
+}
+.btn-quick-sm:hover {
+  background: rgba(46,204,135,.1);
+  border-color: var(--nutriai-primary);
+  color: var(--nutriai-primary);
+}
+
+/* ============================================================
+   FORM ELEMENTS
+============================================================ */
+.form-label-sm {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: .25rem;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+.form-control, .form-select {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.form-control:focus, .form-select:focus {
+  background: var(--bg-card);
+  border-color: var(--nutriai-primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px rgba(46,204,135,.15);
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+  background: #12151f;
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   CHAT UI
+============================================================ */
+.chat-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+.chat-messages {
+  flex: 1;
+  height: 460px;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  scroll-behavior: smooth;
+}
+
+.message-row {
+  display: flex;
+  gap: .75rem;
+  align-items: flex-start;
+  animation: messageSlideIn .3s ease;
+}
+
+.assistant-row { flex-direction: row; }
+.user-row { flex-direction: row-reverse; }
+
+.avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .95rem;
+  flex-shrink: 0;
+}
+
+.avatar-ai {
+  background: linear-gradient(135deg, var(--nutriai-primary), var(--nutriai-primary-dark));
+  color: #fff;
+}
+
+.avatar-user {
+  background: linear-gradient(135deg, var(--nutriai-secondary), #5a7eff);
+  color: #fff;
+  font-size: .75rem; font-weight: 700;
+}
+
+.message-bubble {
+  max-width: 75%;
+  min-width: 80px;
+}
+
+.assistant-bubble .message-content {
+  background: var(--chat-ai-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px var(--radius-md) var(--radius-md) var(--radius-md);
+  padding: .85rem 1rem;
+  color: var(--text-primary);
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+.user-bubble .message-content {
+  background: var(--chat-user-bg);
+  border-radius: var(--radius-md) 4px var(--radius-md) var(--radius-md);
+  padding: .85rem 1rem;
+  color: #fff;
+  font-size: .88rem;
+  line-height: 1.65;
+}
+
+.message-content p { margin-bottom: .5rem; }
+.message-content p:last-child { margin-bottom: 0; }
+.message-content ul { padding-left: 1.2rem; margin-bottom: .5rem; }
+.message-content strong { font-weight: 600; }
+.message-content code {
+  background: rgba(0,0,0,.06);
+  padding: .1rem .3rem;
+  border-radius: 3px;
+  font-size: .85em;
+}
+
+.message-time {
+  font-size: .7rem;
+  color: var(--text-muted);
+  margin-top: .3rem;
+  padding: 0 .25rem;
+}
+.user-row .message-time { text-align: right; }
+
+/* Typing indicator */
+.typing-indicator {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .75rem 1.25rem;
+}
+.typing-dots {
+  display: flex; gap: 4px; align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: .65rem .9rem;
+  border-radius: 4px var(--radius-md) var(--radius-md) var(--radius-md);
+}
+.typing-dots span {
+  width: 7px; height: 7px;
+  background: var(--nutriai-primary);
+  border-radius: 50%;
+  animation: typingBounce 1.2s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: .2s; }
+.typing-dots span:nth-child(3) { animation-delay: .4s; }
+
+/* Chat Input */
+.chat-input-area {
+  padding: 1rem 1.1rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card-header);
+}
+
+.chat-input-area .form-control {
+  resize: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  font-size: .88rem;
+  min-height: 52px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.send-btn {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  min-width: 52px;
+  font-size: 1.1rem;
+  transition: all .2s;
+}
+.send-btn:hover { transform: scale(1.05); }
+
+.ai-status-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(46,204,135,.1);
+  border: 1px solid rgba(46,204,135,.25);
+  color: var(--nutriai-primary);
+  font-size: .72rem; font-weight: 600;
+  padding: .2rem .6rem; border-radius: 12px;
+}
+.status-dot {
+  width: 6px; height: 6px;
+  background: var(--nutriai-primary);
+  border-radius: 50%;
+  animation: statusPulse 1.5s infinite;
+}
+
+/* ============================================================
+   DASHBOARD — STAT CARDS
+============================================================ */
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: transform .2s, box-shadow .2s;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.stat-card-calories::before { background: linear-gradient(90deg, #ff6b6b, #ffa726); }
+.stat-card-protein::before  { background: linear-gradient(90deg, #3b5bdb, #5a7eff); }
+.stat-card-carbs::before    { background: linear-gradient(90deg, #2ecc87, #1fa86d); }
+.stat-card-fats::before     { background: linear-gradient(90deg, #f7c948, #ffa726); }
+
+.stat-card-icon { font-size: 1.5rem; margin-bottom: .5rem; color: var(--text-muted); }
+.stat-card-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.8rem; font-weight: 700;
+  color: var(--text-primary);
+}
+.stat-card-label { font-size: .78rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+
+/* Dashboard Results */
+.calorie-result {
+  text-align: center; padding: 1.5rem 1rem;
+}
+.calorie-big {
+  font-family: 'Poppins', sans-serif;
+  font-size: 3rem; font-weight: 700;
+  background: linear-gradient(135deg, var(--nutriai-primary), var(--nutriai-primary-dark));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.bmr-info { font-size: .85rem; color: var(--text-muted); }
+
+.macro-bars { padding: 1rem 0; }
+.macro-bar-item { margin-bottom: 1rem; }
+.macro-bar-label {
+  display: flex; justify-content: space-between;
+  font-size: .82rem; font-weight: 600; margin-bottom: .3rem;
+}
+.progress {
+  height: 10px; border-radius: 6px;
+  background: var(--bg-body);
+}
+.progress-bar-protein { background: linear-gradient(90deg, #3b5bdb, #5a7eff); }
+.progress-bar-carbs   { background: linear-gradient(90deg, #2ecc87, #5ce8ad); }
+.progress-bar-fats    { background: linear-gradient(90deg, #ffa726, #f7c948); }
+
+/* Tips */
+.tip-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  height: 100%;
+  border-top: 3px solid;
+  transition: transform .2s;
+}
+.tip-card:hover { transform: translateY(-3px); }
+.tip-green  { border-top-color: var(--nutriai-primary); }
+.tip-orange { border-top-color: var(--nutriai-warning); }
+.tip-purple { border-top-color: var(--nutriai-secondary); }
+.tip-icon { font-size: 1.5rem; margin-bottom: .5rem; }
+.tip-green  .tip-icon { color: var(--nutriai-primary); }
+.tip-orange .tip-icon { color: var(--nutriai-warning); }
+.tip-purple .tip-icon { color: var(--nutriai-secondary); }
+.tip-title { font-weight: 700; font-size: .9rem; margin-bottom: .4rem; }
+.tip-text  { font-size: .82rem; color: var(--text-secondary); line-height: 1.5; }
+
+/* ============================================================
+   BMI CALCULATOR
+============================================================ */
+.bmi-circle {
+  width: 150px; height: 150px;
+  border-radius: 50%;
+  border: 6px solid var(--border-color);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  margin: 0 auto;
+  background: var(--bg-body);
+  transition: all .4s;
+  position: relative;
+}
+
+.bmi-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 2.2rem; font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.bmi-label { font-size: .72rem; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+
+.bmi-result-card {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  font-size: .87rem;
+}
+
+/* BMI Scale */
+.bmi-scale { position: relative; padding-bottom: 1.5rem; }
+.bmi-scale-bar {
+  display: flex; border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 50px;
+}
+.bmi-segment {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: .7rem; font-weight: 600;
+  color: #fff;
+  padding: .25rem;
+}
+.bmi-segment span { font-size: .78rem; }
+.bmi-segment small { font-size: .65rem; opacity: .85; }
+.seg-underweight { background: #3b9dd4; }
+.seg-normal      { background: #27ae60; }
+.seg-overweight  { background: #e67e22; }
+.seg-obese       { background: #c0392b; }
+
+.bmi-pointer {
+  position: absolute; bottom: 0;
+  width: 0; height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 12px solid var(--text-primary);
+  transform: translateX(-50%);
+  transition: left .5s ease;
+}
+
+/* BMI table */
+.bmi-table { font-size: .82rem; }
+.bmi-table th {
+  font-weight: 600; text-transform: uppercase;
+  font-size: .74rem; letter-spacing: .4px;
+  color: var(--text-muted);
+  background: var(--bg-body);
+  border-color: var(--border-color);
+}
+.bmi-table td { border-color: var(--border-color); }
+
+/* AI Response Box */
+.ai-response-box {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--nutriai-primary);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  font-size: .87rem;
+  line-height: 1.65;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* ============================================================
+   FAMILY PROFILE
+============================================================ */
+.family-member-card {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: .75rem;
+  display: flex; align-items: center; gap: 1rem;
+  transition: all .2s;
+  animation: slideIn .3s ease;
+}
+.family-member-card:hover {
+  border-color: var(--nutriai-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.member-avatar {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--nutriai-primary), var(--nutriai-secondary));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; color: #fff; font-weight: 700;
+  flex-shrink: 0;
+}
+
+.member-info { flex: 1; }
+.member-name { font-weight: 700; font-size: .95rem; margin-bottom: .15rem; }
+.member-meta { font-size: .78rem; color: var(--text-muted); }
+.member-badges { display: flex; flex-wrap: wrap; gap: .25rem; margin-top: .4rem; }
+.member-badge-item {
+  background: rgba(46,204,135,.1);
+  border: 1px solid rgba(46,204,135,.2);
+  color: var(--nutriai-primary);
+  font-size: .7rem; padding: .15rem .5rem; border-radius: 10px;
+}
+
+/* ============================================================
+   EMPTY STATES
+============================================================ */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 3rem 1rem; text-align: center;
+  color: var(--text-muted);
+}
+.empty-state i { font-size: 3.5rem; margin-bottom: 1rem; opacity: .4; }
+.empty-state p { max-width: 350px; font-size: .88rem; line-height: 1.6; }
+
+/* ============================================================
+   AI OUTPUT / RESULTS
+============================================================ */
+.ai-output {
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  font-size: .87rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.loading-spinner {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 1rem; padding: 3rem;
+  color: var(--text-muted);
+}
+.spinner-border { color: var(--nutriai-primary) !important; }
+
+/* ============================================================
+   FOOTER
+============================================================ */
+.nutriai-footer {
+  background: var(--navbar-bg);
+  color: rgba(255,255,255,.7);
+  padding: 2rem 1rem;
+  margin-top: 3rem;
+}
+.footer-logo { font-size: 1.1rem; color: #fff; }
+.footer-text { font-size: .82rem; color: rgba(255,255,255,.6); }
+.footer-disclaimer { font-size: .75rem; color: rgba(255,255,255,.45); max-width: 600px; margin: .5rem auto; }
+.footer-badges { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+.footer-badge {
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  color: rgba(255,255,255,.65); font-size: .7rem; padding: .2rem .6rem; border-radius: 10px;
+}
+
+/* ============================================================
+   MODAL
+============================================================ */
+[data-bs-theme="dark"] .modal-content {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+[data-bs-theme="dark"] .modal-header {
+  border-color: var(--border-color);
+}
+[data-bs-theme="dark"] .modal-footer {
+  border-color: var(--border-color);
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width: 768px) {
+  .hero-section { padding: 2rem 0 1.5rem; }
+  .hero-stats { gap: 1rem; }
+  .stat-number { font-size: 1.3rem; }
+  .chat-messages { height: 340px; }
+  .message-bubble { max-width: 90%; }
+  .nutriai-tabs .nav-link { padding: .55rem .85rem; font-size: .78rem; }
+  .ibm-badge { display: none; }
+  .nutriai-tab-content { padding: 1rem; border-radius: 0 var(--radius-sm) var(--radius-sm) var(--radius-sm); }
+  .bmi-circle { width: 120px; height: 120px; }
+  .bmi-value { font-size: 1.8rem; }
+}
+
+@media (max-width: 480px) {
+  .hero-title { font-size: 1.7rem; }
+  .hero-subtitle { font-size: .9rem; }
+  .brand-name { font-size: 1.1rem; }
+  .main-container { padding: 0 0 2rem; }
+}
+
+/* ============================================================
+   ANIMATIONS
+============================================================ */
+@keyframes fadeIn        { from { opacity:0 }           to { opacity:1 } }
+@keyframes fadeInDown    { from { opacity:0; transform:translateY(-15px) } to { opacity:1; transform:translateY(0) } }
+@keyframes fadeInUp      { from { opacity:0; transform:translateY(15px) }  to { opacity:1; transform:translateY(0) } }
+@keyframes slideIn       { from { opacity:0; transform:translateX(-10px) } to { opacity:1; transform:translateX(0) } }
+@keyframes messageSlideIn { from { opacity:0; transform:translateY(8px) }  to { opacity:1; transform:translateY(0) } }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0   rgba(46,204,135, .3); }
+  50%       { box-shadow: 0 0 0 20px rgba(46,204,135, 0); }
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity:1; transform:scale(1); }
+  50%       { opacity:.5; transform:scale(.8); }
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%            { transform: translateY(-6px); }
+}
+
+/* ============================================================
+   UTILITY
+============================================================ */
+.text-nutriai       { color: var(--nutriai-primary) !important; }
+.border-nutriai     { border-color: var(--nutriai-primary) !important; }
+.bg-nutriai-light   { background: rgba(46,204,135,.08) !important; }
+.rounded-nutriai    { border-radius: var(--radius-md) !important; }
+.profile-saved-msg  { animation: fadeIn .3s ease; }
+.alert-sm           { font-size: .82rem; padding: .5rem .75rem; margin-bottom: 0; }
+
