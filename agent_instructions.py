@@ -1,6 +1,9 @@
 # ============================================================
 #  AGENT_INSTRUCTIONS — Customize NutriAI Agent Behavior
 # ============================================================
+#  Author     : Krushna Donge (MIT Student)
+#  License    : MIT
+#  Repository : https://github.com/krushna9506/Nutrition_Agent
 #
 #  This file is the single place to tune:
 #    • Persona & tone

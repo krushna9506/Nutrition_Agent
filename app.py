@@ -1,6 +1,10 @@
 # ============================================================
 #  NutriAI Agent — Flask Backend with IBM Watsonx.ai
 # ============================================================
+#  Author     : Krushna Donge (MIT Student)
+#  Created    : 2026
+#  License    : MIT
+#  Repository : https://github.com/krushna9506/Nutrition_Agent
 #  File       : app.py
 #  Model      : meta-llama/llama-3-3-70b-instruct  (au-syd)
 #  SDK        : ibm-watsonx-ai  >=1.5.x

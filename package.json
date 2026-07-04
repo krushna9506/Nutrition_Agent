@@ -1,4 +1,26 @@
 {
+  "name": "nutrition-agent",
+  "version": "1.0.0",
+  "description": "AI-Powered Nutrition Assistant with IBM Watsonx.ai Granite",
+  "author": {
+    "name": "Krushna Donge",
+    "email": "krushna@example.com",
+    "url": "https://linkedin.com/in/krushna-donge"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/krushna9506/Nutrition_Agent.git"
+  },
+  "keywords": [
+    "nutrition",
+    "ai",
+    "ibm-watsonx",
+    "granite",
+    "flask",
+    "meal-planning",
+    "health"
+  ],
   "dependencies": {
     "flask": "^0.2.10"
   }

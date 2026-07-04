@@ -282,8 +282,21 @@ model_id="ibm/granite-13b-instruct-v2",  # Change this
 
 MIT License — Free to use, modify, and deploy.
 
+See [LICENSE](LICENSE) file for details.
+
+---
+
+## 👨‍💼 Author
+
+**Krushna Donge**
+- MIT Student | AI/ML Developer
+- LinkedIn: [linkedin.com/in/krushna-donge](https://linkedin.com/in/krushna-donge)
+- GitHub: [@krushna9506](https://github.com/krushna9506)
+
 ---
 
 <div align="center">
   Made with ❤️ using <strong>IBM Watsonx.ai</strong> × <strong>Granite</strong> × <strong>Flask</strong>
+  <br />
+  © 2026 Krushna Donge. All rights reserved.
 </div>
