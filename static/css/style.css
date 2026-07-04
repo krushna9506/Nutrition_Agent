@@ -821,6 +821,17 @@ body {
   background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
   color: rgba(255,255,255,.65); font-size: .7rem; padding: .2rem .6rem; border-radius: 10px;
 }
+.footer-social-link {
+  display: inline-flex; align-items: center; gap: .35rem;
+  text-decoration: none; transition: transform .2s ease, filter .2s ease, border-color .2s ease;
+}
+.footer-social-link:hover,
+.footer-social-link:focus-visible {
+  color: #fff; transform: translateY(-1px); filter: brightness(1.08);
+}
+.footer-linkedin {
+  background: #0A66C2; border-color: #0A66C2; color: #fff;
+}
 
 /* ============================================================
    MODAL
