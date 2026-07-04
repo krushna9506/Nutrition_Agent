@@ -3,6 +3,34 @@
 *.env.local
 *.env.production
 
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependencies
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
 # --- Python ---
 __pycache__/
 *.py[cod]

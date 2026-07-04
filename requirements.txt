@@ -20,5 +20,5 @@ ibm-cloud-sdk-core==3.25.0
 # --- Data Processing (unpinned; ibm-cloud-sdk-core 3.25 requires >=2.32.4) ---
 requests>=2.32.4
 
-# --- Optional: WSGI server for production (Linux/macOS only) ---
-# gunicorn==22.0.0
+# --- Production WSGI server ---
+gunicorn==22.0.0
