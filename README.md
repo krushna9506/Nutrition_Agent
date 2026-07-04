@@ -8,6 +8,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?logo=flask)
 ![IBM Watsonx](https://img.shields.io/badge/IBM%20Watsonx-Granite-0530AD?logo=ibm)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/krushna9506)
 
 ---
 
@@ -288,10 +289,10 @@ See [LICENSE](LICENSE) file for details.
 
 ## 👨‍💼 Author
 
-**Krushna Donge**
-- MIT Student | AI/ML Developer
-- LinkedIn: [linkedin.com/in/krushna-donge](https://linkedin.com/in/krushna-donge)
-- GitHub: [@krushna9506](https://github.com/krushna9506)
+**Krushna Donge** — MIT Student | AI/ML Developer
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Krushna%20Donge-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/krushna9506?utm_source=share_via&utm_content=profile&utm_medium=member_ios)
+[![GitHub](https://img.shields.io/badge/GitHub-krushna9506-181717?logo=github)](https://github.com/krushna9506)
 
 ---
 
