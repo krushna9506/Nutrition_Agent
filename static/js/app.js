@@ -12,6 +12,8 @@ const state = {
   conversationHistory: [],
   familyMembers: [],
   userProfile: {},
+  weightLogs: [],
+  weightChartInstance: null,
   isDarkMode: false,
 };
 
@@ -26,20 +28,66 @@ function formatTime(isoString) {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Convert **bold** and bullet lines in AI text to basic HTML */
+/** Convert markdown tags (bold, lists, headers, quotes) to clean HTML */
 function renderMarkdown(text) {
   if (!text) return '';
+  
+  // Split into blocks by double newlines
+  const blocks = text.split(/\n\n+/);
+  
+  const parsedBlocks = blocks.map(block => {
+    block = block.trim();
+    if (!block) return '';
+    
+    // Unordered List
+    if (block.startsWith('-') || block.startsWith('*') || block.startsWith('•')) {
+      const items = block.split(/\n+/).map(line => {
+        const itemText = line.replace(/^[-*•]\s+/, '').trim();
+        return `<li>${parseInlineMarkdown(itemText)}</li>`;
+      }).join('');
+      return `<ul>${items}</ul>`;
+    }
+    
+    // Ordered List
+    if (/^\d+\.\s+/.test(block)) {
+      const items = block.split(/\n+/).map(line => {
+        const itemText = line.replace(/^\d+\.\s+/, '').trim();
+        return `<li>${parseInlineMarkdown(itemText)}</li>`;
+      }).join('');
+      return `<ol>${items}</ol>`;
+    }
+    
+    // Headers
+    if (block.startsWith('###')) {
+      return `<h5>${parseInlineMarkdown(block.replace(/^###\s+/, ''))}</h5>`;
+    }
+    if (block.startsWith('##')) {
+      return `<h4>${parseInlineMarkdown(block.replace(/^##\s+/, ''))}</h4>`;
+    }
+    if (block.startsWith('#')) {
+      return `<h3>${parseInlineMarkdown(block.replace(/^#\s+/, ''))}</h3>`;
+    }
+    
+    // Blockquote
+    if (block.startsWith('>')) {
+      return `<blockquote class="border-start border-3 ps-3 text-muted" style="border-color: var(--nutriai-primary) !important;">${parseInlineMarkdown(block.replace(/^>\s*/, ''))}</blockquote>`;
+    }
+    
+    // Normal paragraph
+    return `<p>${parseInlineMarkdown(block)}</p>`;
+  });
+  
+  return parsedBlocks.filter(b => b).join('\n');
+}
+
+function parseInlineMarkdown(text) {
   return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^#{1,3}\s(.+)$/gm, '<strong>$1</strong>')
-    .replace(/^[-•]\s(.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^(.+)$/gm, (line) =>
-      line.startsWith('<') ? line : `<p>${line}</p>`
-    )
-    .replace(/<p><\/p>/g, '');
+    .replace(/`(.*?)`/g, '<code>$1</code>');
 }
 
 function showLoading(containerId, message = 'Generating AI response…') {
@@ -93,12 +141,27 @@ function getProfile() {
     health_conditions: $('profileHealth')?.value.trim() || '',
     allergies:         $('profileAllergies')?.value.trim() || '',
     activity:          $('profileActivity')?.value || 'moderate',
+    budget_friendly:   $('profileBudgetFriendly')?.checked || false,
+    preferred_language:$('languageSelect')?.value || 'English',
+    selected_model:    $('watsonxModelSelect')?.value || 'meta-llama/llama-3-3-70b-instruct'
   };
 }
 
-function saveProfile() {
+async function saveProfile() {
   state.userProfile = getProfile();
   localStorage.setItem('nutriai-profile', JSON.stringify(state.userProfile));
+  
+  // Sync to database
+  try {
+    await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state.userProfile)
+    });
+  } catch (err) {
+    console.error('Profile DB sync failed:', err);
+  }
+
   const msg = document.querySelector('.profile-saved-msg');
   if (msg) {
     msg.classList.remove('d-none');
@@ -106,23 +169,41 @@ function saveProfile() {
   }
 }
 
-function loadProfile() {
-  const saved = localStorage.getItem('nutriai-profile');
-  if (!saved) return;
+async function loadProfile() {
+  let p = null;
   try {
-    const p = JSON.parse(saved);
-    const setVal = (id, val) => { if ($(id) && val) $(id).value = val; };
-    setVal('profileName',      p.name);
-    setVal('profileAge',       p.age);
-    setVal('profileGender',    p.gender);
-    setVal('profileWeight',    p.weight);
-    setVal('profileHeight',    p.height);
-    setVal('profileGoal',      p.goal);
-    setVal('profileDiet',      p.diet_type);
-    setVal('profileHealth',    p.health_conditions);
-    setVal('profileAllergies', p.allergies);
-    state.userProfile = p;
-  } catch (_) { /* ignore corrupted data */ }
+    // Try to load from database first
+    const res = await fetch('/api/profile');
+    p = await res.json();
+  } catch (err) {
+    console.error('Failed to load profile from DB, falling back to local storage:', err);
+  }
+
+  if (!p || Object.keys(p).length === 0) {
+    const saved = localStorage.getItem('nutriai-profile');
+    if (saved) {
+      try { p = JSON.parse(saved); } catch (_) {}
+    }
+  }
+
+  if (!p) return;
+
+  const setVal = (id, val) => { if ($(id) && val !== undefined && val !== null) $(id).value = val; };
+  setVal('profileName',      p.name);
+  setVal('profileAge',       p.age);
+  setVal('profileGender',    p.gender);
+  setVal('profileWeight',    p.weight);
+  setVal('profileHeight',    p.height);
+  setVal('profileGoal',      p.goal);
+  setVal('profileDiet',      p.diet_type);
+  setVal('profileHealth',    p.health_conditions);
+  setVal('profileAllergies', p.allergies);
+  
+  if ($('profileBudgetFriendly')) $('profileBudgetFriendly').checked = !!p.budget_friendly;
+  if ($('languageSelect')) $('languageSelect').value = p.preferred_language || 'English';
+  if ($('watsonxModelSelect')) $('watsonxModelSelect').value = p.selected_model || 'meta-llama/llama-3-3-70b-instruct';
+  
+  state.userProfile = p;
 }
 
 $('saveProfile')?.addEventListener('click', saveProfile);
@@ -212,6 +293,23 @@ async function sendMessage(messageText) {
   }
 }
 
+async function loadChatHistory() {
+  try {
+    const res = await fetch('/api/chat-history');
+    const messages = await res.json();
+    if (messages && messages.length > 0) {
+      const container = $('chatMessages');
+      if (container) container.innerHTML = '';
+      messages.forEach(msg => {
+        appendMessage(msg.role, msg.content, msg.timestamp);
+        state.conversationHistory.push({ role: msg.role, content: msg.content });
+      });
+    }
+  } catch (err) {
+    console.error('Failed to load chat history:', err);
+  }
+}
+
 // Chat event listeners
 $('sendBtn')?.addEventListener('click', () => sendMessage());
 
@@ -224,11 +322,17 @@ $('chatInput')?.addEventListener('input', function () {
   if (count) count.textContent = `${this.value.length}/2000`;
 });
 
-$('clearChat')?.addEventListener('click', () => {
+$('clearChat')?.addEventListener('click', async () => {
+  if (!confirm('Are you sure you want to clear chat history?')) return;
   const container = $('chatMessages');
   if (container) {
     container.innerHTML = '';
     state.conversationHistory = [];
+    try {
+      await fetch('/api/chat-history', { method: 'DELETE' });
+    } catch (err) {
+      console.error('Failed to clear chat history from DB:', err);
+    }
     // Re-add welcome message
     appendMessage('assistant',
       '👋 Chat cleared! How can I help you with your nutrition goals today?',
@@ -343,7 +447,7 @@ $('getBmiAdvice')?.addEventListener('click', async () => {
   const adviceEl  = $('bmiAiAdvice');
   const adviceBox = $('bmiAiAdviceText');
   if (adviceEl) adviceEl.classList.remove('d-none');
-  if (adviceBox) adviceBox.textContent = 'Generating personalized advice…';
+  if (adviceBox) adviceBox.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"></div> Generating personalized advice…';
 
   const message = `My BMI is ${bmiVal} (${bmiCat}). I am ${age} years old and follow a ${diet} diet. Give me specific Indian food recommendations, lifestyle changes, and a simple 3-day meal plan to reach a healthy BMI.`;
 
@@ -351,13 +455,13 @@ $('getBmiAdvice')?.addEventListener('click', async () => {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history: [], profile: {} }),
+      body: JSON.stringify({ message, history: [], profile: getProfile() }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    if (adviceBox) adviceBox.textContent = data.response;
+    if (adviceBox) adviceBox.innerHTML = renderMarkdown(data.response);
   } catch (err) {
-    if (adviceBox) adviceBox.textContent = `Error: ${err.message}`;
+    if (adviceBox) adviceBox.innerHTML = `Error: ${err.message}`;
   }
 });
 
@@ -445,22 +549,24 @@ $('calcDashBtn')?.addEventListener('click', calculateDashboard);
 //  MEAL PLANNER
 // ============================================================
 async function generateMealPlan() {
-  const profile = {
-    name:             $('mealName')?.value.trim()  || 'Friend',
-    age:              $('mealAge')?.value           || '',
-    gender:           $('mealGender')?.value        || 'male',
-    weight:           $('mealWeight')?.value        || '',
-    height:           $('mealHeight')?.value        || '',
-    goal:             $('mealGoal')?.value          || 'maintenance',
-    diet_type:        $('mealDiet')?.value          || 'vegetarian',
-    health_conditions:$('mealHealth')?.value.trim() || 'none',
-  };
+  const profile = getProfile();
+  profile.name = $('mealName')?.value.trim() || profile.name || 'Friend';
+  profile.age = $('mealAge')?.value || profile.age;
+  profile.gender = $('mealGender')?.value || profile.gender || 'male';
+  profile.weight = $('mealWeight')?.value || profile.weight;
+  profile.height = $('mealHeight')?.value || profile.height;
+  profile.goal = $('mealGoal')?.value || profile.goal || 'maintenance';
+  profile.diet_type = $('mealDiet')?.value || profile.diet_type || 'vegetarian';
+  profile.health_conditions = $('mealHealth')?.value.trim() || profile.health_conditions || 'none';
+
   const days        = $('mealDays')?.value  || 7;
   const preferences = $('mealPreferences')?.value.trim() || '';
 
+  if ($('mealPlanCardTitle')) $('mealPlanCardTitle').textContent = 'Your Personalized Meal Plan';
   showLoading('mealPlanOutput', 'Generating your personalized meal plan…');
   $('generateMealPlan').disabled = true;
   $('copyMealPlan')?.classList.add('d-none');
+  $('printMealPlan')?.classList.add('d-none');
 
   try {
     const res = await fetch('/api/meal-plan', {
@@ -472,8 +578,9 @@ async function generateMealPlan() {
     if (data.error) throw new Error(data.error);
 
     $('mealPlanOutput').innerHTML = `
-      <div class="ai-output">${escapeHtml(data.meal_plan)}</div>`;
+      <div class="ai-output">${renderMarkdown(data.meal_plan)}</div>`;
     $('copyMealPlan')?.classList.remove('d-none');
+    $('printMealPlan')?.classList.remove('d-none');
   } catch (err) {
     showError('mealPlanOutput', err.message);
   } finally {
@@ -481,10 +588,44 @@ async function generateMealPlan() {
   }
 }
 
+async function generatePantryRecipe() {
+  const ingredients = $('pantryIngredients')?.value.trim();
+  if (!ingredients) {
+    alert('Please list some ingredients in your pantry first.');
+    return;
+  }
+
+  if ($('mealPlanCardTitle')) $('mealPlanCardTitle').textContent = 'Your AI Pantry Recipe';
+  showLoading('mealPlanOutput', 'Watsonx.ai is cooking up a recipe…');
+  $('generateRecipeBtn').disabled = true;
+  $('copyMealPlan')?.classList.add('d-none');
+  $('printMealPlan')?.classList.add('d-none');
+
+  try {
+    const res = await fetch('/api/generate-recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredients, profile: getProfile() }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    $('mealPlanOutput').innerHTML = `
+      <div class="ai-output">${renderMarkdown(data.recipe)}</div>`;
+    $('copyMealPlan')?.classList.remove('d-none');
+    $('printMealPlan')?.classList.remove('d-none');
+  } catch (err) {
+    showError('mealPlanOutput', err.message);
+  } finally {
+    $('generateRecipeBtn').disabled = false;
+  }
+}
+
 $('generateMealPlan')?.addEventListener('click', generateMealPlan);
+$('generateRecipeBtn')?.addEventListener('click', generatePantryRecipe);
 
 $('copyMealPlan')?.addEventListener('click', () => {
-  const text = document.querySelector('#mealPlanOutput .ai-output')?.textContent;
+  const text = document.querySelector('#mealPlanOutput .ai-output')?.innerText;
   if (text) {
     navigator.clipboard.writeText(text).then(() => {
       $('copyMealPlan').innerHTML = '<i class="bi bi-check2 me-1"></i>Copied!';
@@ -506,10 +647,16 @@ async function analyzeFood() {
   $('analyzeFood').disabled = true;
 
   try {
+    const p = getProfile();
     const res = await fetch('/api/analyze-food', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ food_description: desc }),
+      body: JSON.stringify({ 
+        food_description: desc,
+        selected_model: p.selected_model,
+        preferred_language: p.preferred_language,
+        budget_friendly: p.budget_friendly
+      }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -519,7 +666,7 @@ async function analyzeFood() {
         <small class="text-muted"><i class="bi bi-bowl-hot me-1"></i>Analyzed:</small>
         <strong>${escapeHtml(data.food)}</strong>
       </div>
-      <div class="ai-output">${escapeHtml(data.analysis)}</div>`;
+      <div class="ai-output">${renderMarkdown(data.analysis)}</div>`;
   } catch (err) {
     showError('foodAnalysisOutput', err.message);
   } finally {
@@ -540,7 +687,7 @@ $$('.btn-quick-sm').forEach(btn => {
 // ============================================================
 //  FAMILY PROFILE
 // ============================================================
-function renderFamilyMembers() {
+async function renderFamilyMembers() {
   const container = $('familyMembersContainer');
   const emptyState = $('familyEmptyState');
   if (!container) return;
@@ -557,7 +704,7 @@ function renderFamilyMembers() {
     Father: '👨', Mother: '👩', Grandparent: '👴',
   };
 
-  state.familyMembers.forEach((member, idx) => {
+  state.familyMembers.forEach((member) => {
     const div = document.createElement('div');
     div.className = 'family-member-card';
     const icon = relationIcons[member.relation] || '👤';
@@ -576,46 +723,47 @@ function renderFamilyMembers() {
           ${member.activity  ? `<span class="member-badge-item">${member.activity}</span>` : ''}
         </div>
       </div>
-      <button class="btn btn-sm btn-outline-danger ms-auto" data-idx="${idx}" title="Remove">
+      <button class="btn btn-sm btn-outline-danger ms-auto" data-id="${member.id}" title="Remove">
         <i class="bi bi-trash3"></i>
       </button>`;
     container.appendChild(div);
   });
 
   // Remove button handlers
-  container.querySelectorAll('[data-idx]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.getAttribute('data-idx'));
-      state.familyMembers.splice(idx, 1);
-      saveFamilyToStorage();
-      renderFamilyMembers();
+  container.querySelectorAll('[data-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const dbId = btn.getAttribute('data-id');
+      try {
+        await fetch(`/api/family-members/${dbId}`, { method: 'DELETE' });
+        await loadFamilyMembers();
+      } catch (err) {
+        console.error('Failed to delete family member:', err);
+      }
     });
   });
 }
 
-function saveFamilyToStorage() {
-  localStorage.setItem('nutriai-family', JSON.stringify(state.familyMembers));
-}
-
-function loadFamilyFromStorage() {
-  const saved = localStorage.getItem('nutriai-family');
-  if (saved) {
-    try { state.familyMembers = JSON.parse(saved); renderFamilyMembers(); } catch (_) {}
+async function loadFamilyMembers() {
+  try {
+    const res = await fetch('/api/family-members');
+    state.familyMembers = await res.json();
+    await renderFamilyMembers();
+  } catch (err) {
+    console.error('Failed to load family members:', err);
   }
 }
 
 $('addFamilyMember')?.addEventListener('click', () => {
-  // Clear modal fields
   ['fmName','fmAge','fmWeight','fmHeight','fmConditions'].forEach(id => { if ($(id)) $(id).value = ''; });
   const modal = new bootstrap.Modal($('familyMemberModal'));
   modal.show();
 });
 
-$('saveFamilyMember')?.addEventListener('click', () => {
+$('saveFamilyMember')?.addEventListener('click', async () => {
   const name = $('fmName')?.value.trim();
   if (!name) { alert('Please enter a name.'); return; }
 
-  state.familyMembers.push({
+  const payload = {
     name,
     relation:   $('fmRelation')?.value   || 'Member',
     age:        $('fmAge')?.value        || '',
@@ -625,10 +773,19 @@ $('saveFamilyMember')?.addEventListener('click', () => {
     goal:       $('fmGoal')?.value       || 'maintenance',
     activity:   $('fmActivity')?.value   || 'moderate',
     conditions: $('fmConditions')?.value.trim() || '',
-  });
+  };
 
-  saveFamilyToStorage();
-  renderFamilyMembers();
+  try {
+    await fetch('/api/family-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    await loadFamilyMembers();
+  } catch (err) {
+    console.error('Failed to save family member to DB:', err);
+  }
+
   bootstrap.Modal.getInstance($('familyMemberModal'))?.hide();
 });
 
@@ -640,12 +797,19 @@ async function generateFamilyPlan() {
 
   showLoading('familyPlanOutput', 'Generating family nutrition plan…');
   $('generateFamilyPlan').disabled = true;
+  $('printFamilyPlan')?.classList.add('d-none');
 
   try {
+    const p = getProfile();
     const res = await fetch('/api/family-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ members: state.familyMembers }),
+      body: JSON.stringify({ 
+        members: state.familyMembers,
+        selected_model: p.selected_model,
+        preferred_language: p.preferred_language,
+        budget_friendly: p.budget_friendly
+      }),
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -653,10 +817,11 @@ async function generateFamilyPlan() {
     $('familyPlanOutput').innerHTML = `
       <div class="mb-2 p-2 rounded d-flex align-items-center gap-2"
            style="background:rgba(46,204,135,.08);border:1px solid rgba(46,204,135,.2);">
-        <i class="bi bi-people-fill text-success"></i>
-        <span><strong>${data.member_count} family member(s)</strong> — Unified Nutrition Plan</span>
+         <i class="bi bi-people-fill text-success"></i>
+         <span><strong>${data.member_count} family member(s)</strong> — Unified Nutrition Plan</span>
       </div>
-      <div class="ai-output">${escapeHtml(data.family_plan)}</div>`;
+      <div class="ai-output">${renderMarkdown(data.family_plan)}</div>`;
+    $('printFamilyPlan')?.classList.remove('d-none');
   } catch (err) {
     showError('familyPlanOutput', err.message);
   } finally {
@@ -667,12 +832,165 @@ async function generateFamilyPlan() {
 $('generateFamilyPlan')?.addEventListener('click', generateFamilyPlan);
 
 // ============================================================
+//  WEIGHT & BMI PROGRESS TRACKER (CHART.JS)
+// ============================================================
+async function loadWeightLogs() {
+  try {
+    const res = await fetch('/api/weight-logs');
+    state.weightLogs = await res.json();
+    renderWeightChart();
+  } catch (err) {
+    console.error('Failed to load weight logs:', err);
+  }
+}
+
+async function logTodayWeight() {
+  const w = parseFloat($('logWeightVal')?.value);
+  const h = parseFloat($('logHeightVal')?.value);
+  if (!w || !h || w <= 0 || h <= 0) {
+    alert('Please enter a valid weight and height.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/weight-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weight: w, height: h })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Reset weight input
+    if ($('logWeightVal')) $('logWeightVal').value = '';
+    
+    // Refresh weight logs
+    await loadWeightLogs();
+  } catch (err) {
+    alert('Failed to log weight: ' + err.message);
+  }
+}
+
+function renderWeightChart() {
+  const canvas = $('weightProgressChart');
+  const emptyState = $('weightChartEmpty');
+  if (!canvas) return;
+
+  if (state.weightLogs.length === 0) {
+    canvas.style.display = 'none';
+    emptyState?.classList.remove('d-none');
+    return;
+  }
+  canvas.style.display = 'block';
+  emptyState?.classList.add('d-none');
+
+  const labels = state.weightLogs.map(log => {
+    const d = new Date(log.date);
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  });
+  const weights = state.weightLogs.map(log => log.weight);
+  const bmis = state.weightLogs.map(log => log.bmi);
+
+  if (state.weightChartInstance) {
+    state.weightChartInstance.destroy();
+  }
+
+  const ctx = canvas.getContext('2d');
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const textColor = isDark ? '#a0aec0' : '#4a5568';
+  const gridColor = isDark ? '#3d444d' : '#e2e8f0';
+
+  state.weightChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Weight (kg)',
+          data: weights,
+          borderColor: '#2ecc71',
+          backgroundColor: 'rgba(46, 204, 113, 0.1)',
+          yAxisID: 'y',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+        },
+        {
+          label: 'BMI',
+          data: bmis,
+          borderColor: '#3498db',
+          backgroundColor: 'rgba(52, 152, 219, 0.1)',
+          yAxisID: 'y1',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          grid: { color: gridColor },
+          ticks: { color: textColor },
+          title: { display: true, text: 'Weight (kg)', color: textColor }
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { color: textColor },
+          title: { display: true, text: 'BMI', color: textColor }
+        }
+      },
+      plugins: {
+        legend: {
+          labels: { color: textColor }
+        }
+      }
+    }
+  });
+}
+
+function initPrintHandlers() {
+  $('printMealPlan')?.addEventListener('click', () => {
+    const card = $('mealPlanOutput').closest('.panel-card');
+    if (card) {
+      card.classList.add('print-target');
+      window.print();
+      card.classList.remove('print-target');
+    }
+  });
+
+  $('printFamilyPlan')?.addEventListener('click', () => {
+    const card = $('familyPlanOutput').closest('.panel-card');
+    if (card) {
+      card.classList.add('print-target');
+      window.print();
+      card.classList.remove('print-target');
+    }
+  });
+}
+
+// ============================================================
 //  INIT
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initTheme();
-  loadProfile();
-  loadFamilyFromStorage();
+  await loadProfile();
+  await loadChatHistory();
+  await loadFamilyMembers();
+  await loadWeightLogs();
+  initPrintHandlers();
 
   // Focus chat input on chat tab show
   document.querySelector('#chat-tab')?.addEventListener('shown.bs.tab', () => {
@@ -695,8 +1013,38 @@ document.addEventListener('DOMContentLoaded', () => {
   // Pre-fill BMI from profile
   document.querySelector('#bmi-tab')?.addEventListener('shown.bs.tab', () => {
     const p = state.userProfile;
-    if (p.weight && $('bmiWeight')) $('bmiWeight').value = p.weight;
-    if (p.height && $('bmiHeight')) $('bmiHeight').value = p.height;
+    if (p.weight && $('bmiWeight')) {
+      $('bmiWeight').value = p.weight;
+      if ($('logWeightVal')) $('logWeightVal').value = p.weight;
+    }
+    if (p.height && $('bmiHeight')) {
+      $('bmiHeight').value = p.height;
+      if ($('logHeightVal')) $('logHeightVal').value = p.height;
+    }
     if (p.age    && $('bmiAgeInput')) $('bmiAgeInput').value = p.age;
+  });
+
+  // Sync Navbar selections with backend profile
+  $('watsonxModelSelect')?.addEventListener('change', async function() {
+    state.userProfile.selected_model = this.value;
+    await saveProfile();
+  });
+
+  $('languageSelect')?.addEventListener('change', async function() {
+    state.userProfile.preferred_language = this.value;
+    await saveProfile();
+  });
+
+  $('profileBudgetFriendly')?.addEventListener('change', async function() {
+    state.userProfile.budget_friendly = this.checked;
+    await saveProfile();
+  });
+
+  // Weight Logging button binding
+  $('logWeightBtn')?.addEventListener('click', logTodayWeight);
+
+  // Redraw chart on theme toggle to adjust label colors
+  $('themeToggle')?.addEventListener('click', () => {
+    setTimeout(renderWeightChart, 150);
   });
 });

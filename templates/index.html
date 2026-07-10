@@ -11,6 +11,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Custom CSS -->
   <link href="/static/css/style.css" rel="stylesheet" />
 </head>
@@ -32,12 +34,26 @@
     </a>
 
     <div class="d-flex align-items-center gap-2 ms-auto">
+      <!-- Watsonx Model Selector -->
+      <select class="form-select form-select-sm header-select" id="watsonxModelSelect" title="Select IBM Watsonx.ai Model">
+        <option value="meta-llama/llama-3-3-70b-instruct" selected>Llama 3.3 70B</option>
+        <option value="ibm/granite-3-8b-instruct">Granite 3.0 8B</option>
+        <option value="ibm/granite-13b-instruct-v2">Granite 13B v2</option>
+      </select>
+      <!-- Language Selector -->
+      <select class="form-select form-select-sm header-select" id="languageSelect" title="Preferred Language">
+        <option value="English" selected>English</option>
+        <option value="Hindi">Hindi (हिंदी)</option>
+        <option value="Tamil">Tamil (தமிழ்)</option>
+        <option value="Telugu">Telugu (తెలుగు)</option>
+        <option value="Marathi">Marathi (మराठी)</option>
+      </select>
       <!-- Dark Mode Toggle -->
       <button class="btn btn-sm theme-toggle" id="themeToggle" title="Toggle Dark Mode">
         <i class="bi bi-moon-fill" id="themeIcon"></i>
       </button>
       <!-- IBM Badge -->
-      <span class="ibm-badge">
+      <span class="ibm-badge d-none d-md-inline-block">
         <i class="bi bi-cpu-fill me-1"></i>Powered by IBM Watsonx
       </span>
     </div>
@@ -234,6 +250,12 @@
                   <label class="form-label-sm">Allergies</label>
                   <input type="text" class="form-control form-control-sm" id="profileAllergies"
                          placeholder="e.g., nuts, lactose" />
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input class="form-check-input" type="checkbox" id="profileBudgetFriendly" />
+                  <label class="form-check-label small fw-semibold text-muted" for="profileBudgetFriendly">
+                    💰 Budget-Friendly Mode
+                  </label>
                 </div>
                 <button class="btn btn-primary-nutriai btn-sm w-100" id="saveProfile">
                   <i class="bi bi-check-circle me-1"></i>Save Profile
@@ -449,6 +471,43 @@
             </div>
           </div>
 
+          <!-- Weight Progress Row -->
+          <div class="col-lg-4">
+            <div class="panel-card h-100">
+              <div class="panel-card-header">
+                <i class="bi bi-calendar-check-fill me-2"></i>Log Today's Weight
+              </div>
+              <div class="panel-card-body">
+                <p class="text-muted small">Keep track of your weight daily to see your health and BMI trend over time.</p>
+                <div class="mb-3">
+                  <label class="form-label-sm">Weight (kg)</label>
+                  <input type="number" class="form-control form-control-sm" id="logWeightVal" placeholder="70" step="0.1" />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label-sm">Height (cm) - for BMI</label>
+                  <input type="number" class="form-control form-control-sm" id="logHeightVal" placeholder="170" />
+                </div>
+                <button class="btn btn-primary-nutriai w-100" id="logWeightBtn">
+                  <i class="bi bi-plus-circle me-1"></i>Log Weight
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-8">
+            <div class="panel-card h-100">
+              <div class="panel-card-header">
+                <i class="bi bi-graph-up me-2"></i>Weight &amp; BMI Progress Tracker
+              </div>
+              <div class="panel-card-body d-flex flex-column justify-content-center align-items-center position-relative" style="min-height: 250px;">
+                <canvas id="weightProgressChart" style="max-height: 250px; width: 100%;"></canvas>
+                <div class="empty-state w-100 h-100 d-none" id="weightChartEmpty">
+                  <i class="bi bi-graph-up-arrow"></i>
+                  <p>No weight logs recorded yet. Log your weight to generate the progress chart.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Nutrition Tips -->
           <div class="col-12">
             <div class="panel-card">
@@ -567,15 +626,37 @@
                 </button>
               </div>
             </div>
+
+            <!-- Pantry Recipe Card -->
+            <div class="panel-card mt-3">
+              <div class="panel-card-header">
+                <i class="bi bi-egg-fried me-2"></i>AI Pantry Recipe Generator
+              </div>
+              <div class="panel-card-body">
+                <p class="text-muted small mb-2">Type the ingredients you have at home to generate a healthy Indian recipe custom to your goals.</p>
+                <div class="mb-3">
+                  <label class="form-label-sm">Ingredients in Pantry</label>
+                  <textarea class="form-control form-control-sm" id="pantryIngredients" rows="2" placeholder="e.g., paneer, spinach, wheat flour"></textarea>
+                </div>
+                <button class="btn btn-success w-100" id="generateRecipeBtn">
+                  <i class="bi bi-lightning-fill me-1"></i>Generate AI Recipe
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="col-lg-8">
             <div class="panel-card h-100">
               <div class="panel-card-header d-flex justify-content-between align-items-center">
-                <div><i class="bi bi-calendar3-week-fill me-2"></i>Your Personalized Meal Plan</div>
-                <button class="btn btn-sm btn-outline-secondary d-none" id="copyMealPlan" title="Copy plan">
-                  <i class="bi bi-clipboard me-1"></i>Copy
-                </button>
+                <div><i class="bi bi-calendar3-week-fill me-2"></i><span id="mealPlanCardTitle">Your Personalized Meal Plan</span></div>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary d-none" id="copyMealPlan" title="Copy plan">
+                    <i class="bi bi-clipboard me-1"></i>Copy
+                  </button>
+                  <button class="btn btn-sm btn-outline-primary d-none" id="printMealPlan" title="Print plan">
+                    <i class="bi bi-printer me-1"></i>Print
+                  </button>
+                </div>
               </div>
               <div class="panel-card-body" id="mealPlanOutput">
                 <div class="empty-state">
@@ -755,9 +836,14 @@
             <div class="panel-card">
               <div class="panel-card-header d-flex justify-content-between align-items-center">
                 <div><i class="bi bi-calendar3-week-fill me-2"></i>Family Nutrition Plan</div>
-                <button class="btn btn-primary-nutriai" id="generateFamilyPlan">
-                  <i class="bi bi-magic me-2"></i>Generate Family Plan
-                </button>
+                <div class="d-flex gap-1 align-items-center">
+                  <button class="btn btn-sm btn-outline-primary d-none" id="printFamilyPlan" title="Print plan">
+                    <i class="bi bi-printer me-1"></i>Print
+                  </button>
+                  <button class="btn btn-primary-nutriai" id="generateFamilyPlan">
+                    <i class="bi bi-magic me-2"></i>Generate Family Plan
+                  </button>
+                </div>
               </div>
               <div class="panel-card-body" id="familyPlanOutput">
                 <div class="empty-state">

@@ -11,7 +11,6 @@
 #  API used   : ModelInference.chat()  — structured messages
 #  Credentials: loaded from .env via python-dotenv
 # ============================================================
-
 import os
 import logging
 from pathlib import Path
@@ -19,6 +18,7 @@ from datetime import datetime
 
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 
 # --- IBM Watsonx.ai SDK ---
@@ -40,18 +40,26 @@ WATSONX_PROJECT_ID = os.getenv("WATSONX_PROJECT_ID", "")
 WATSONX_URL        = os.getenv("WATSONX_URL",        "https://au-syd.ml.cloud.ibm.com")
 FLASK_SECRET_KEY   = os.getenv("FLASK_SECRET_KEY",   "dev-secret-key")
 FLASK_PORT         = int(os.getenv("FLASK_PORT",  5000))
-MAX_TOKENS         = int(os.getenv("MAX_TOKENS",  1024))
+MAX_TOKENS         = int(os.getenv("MAX_TOKENS",  2048))
 TEMPERATURE        = float(os.getenv("TEMPERATURE", 0.7))
 
-# Model served in the au-syd region that supports chat completions
-WATSONX_MODEL_ID   = "meta-llama/llama-3-3-70b-instruct"
-
 # ============================================================
-#  FLASK APP
+#  FLASK APP & DATABASE
 # ============================================================
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET_KEY
 CORS(app)
+
+db_url = os.getenv("DATABASE_URL", "sqlite:///nutriai.db")
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+pg8000://", 1)
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+pg8000://", 1)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,34 +67,78 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Models ---
+class UserProfileModel(db.Model):
+    __tablename__ = "user_profiles"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=True)
+    age = db.Column(db.Integer, nullable=True)
+    gender = db.Column(db.String(20), nullable=True)
+    weight = db.Column(db.Float, nullable=True)
+    height = db.Column(db.Float, nullable=True)
+    goal = db.Column(db.String(50), nullable=True)
+    diet_type = db.Column(db.String(50), nullable=True)
+    health_conditions = db.Column(db.Text, nullable=True)
+    allergies = db.Column(db.Text, nullable=True)
+    activity = db.Column(db.String(50), nullable=True)
+    budget_friendly = db.Column(db.Boolean, default=False)
+    preferred_language = db.Column(db.String(30), default="English")
+    selected_model = db.Column(db.String(100), default="meta-llama/llama-3-3-70b-instruct")
+
+class FamilyMemberModel(db.Model):
+    __tablename__ = "family_members"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    relation = db.Column(db.String(50), nullable=False)
+    age = db.Column(db.Integer, nullable=True)
+    gender = db.Column(db.String(20), nullable=True)
+    weight = db.Column(db.Float, nullable=True)
+    height = db.Column(db.Float, nullable=True)
+    goal = db.Column(db.String(50), nullable=True)
+    activity = db.Column(db.String(50), nullable=True)
+    conditions = db.Column(db.Text, nullable=True)
+
+class ChatMessageModel(db.Model):
+    __tablename__ = "chat_messages"
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(20), nullable=False)  # 'user' or 'assistant'
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+class WeightLogModel(db.Model):
+    __tablename__ = "weight_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    weight = db.Column(db.Float, nullable=False)
+    bmi = db.Column(db.Float, nullable=False)
+    log_date = db.Column(db.Date, default=datetime.utcnow)
+
+# Auto-create tables
+with app.app_context():
+    db.create_all()
+
 # ============================================================
-#  WATSONX.AI — singleton model client
+#  WATSONX.AI — multi-model client registry
 # ============================================================
-_model: ModelInference | None = None
+_models: dict[str, ModelInference] = {}
 
 def _is_placeholder(val: str) -> bool:
     v = (val or "").strip()
     return not v or v.startswith("your_")
 
-
 def _credentials_ok() -> bool:
     return not _is_placeholder(IBM_CLOUD_API_KEY) and not _is_placeholder(WATSONX_PROJECT_ID)
 
-
-def get_model() -> ModelInference | None:
+def get_model(model_id: str = "meta-llama/llama-3-3-70b-instruct") -> ModelInference | None:
     """
-    Lazy-initialize and return the Watsonx.ai ModelInference client.
-    Returns None when credentials are missing so callers fall back
-    to the offline helpers.
+    Lazy-initialize and return the Watsonx.ai ModelInference client for the requested model.
     """
-    global _model
-    if _model is not None:
-        return _model
+    global _models
+    if model_id in _models:
+        return _models[model_id]
 
     if not _credentials_ok():
         logger.warning(
-            "Watsonx.ai credentials not configured — running in offline fallback mode. "
-            "Set IBM_CLOUD_API_KEY and WATSONX_PROJECT_ID in .env to enable AI responses."
+            "Watsonx.ai credentials not configured — running in offline fallback mode."
         )
         return None
 
@@ -94,7 +146,6 @@ def get_model() -> ModelInference | None:
         credentials = Credentials(url=WATSONX_URL, api_key=IBM_CLOUD_API_KEY)
         client      = APIClient(credentials=credentials, project_id=WATSONX_PROJECT_ID)
 
-        # Chat-completion parameters — the chat() API uses "max_tokens", not "max_new_tokens"
         chat_params = {
             "max_tokens":       MAX_TOKENS,
             GenParams.TEMPERATURE:       TEMPERATURE,
@@ -102,44 +153,56 @@ def get_model() -> ModelInference | None:
             GenParams.REPETITION_PENALTY: 1.05,
         }
 
-        _model = ModelInference(
-            model_id=WATSONX_MODEL_ID,
+        model = ModelInference(
+            model_id=model_id,
             api_client=client,
             project_id=WATSONX_PROJECT_ID,
             params=chat_params,
         )
-        logger.info("Watsonx.ai model ready: %s @ %s", WATSONX_MODEL_ID, WATSONX_URL)
-        return _model
+        _models[model_id] = model
+        logger.info("Watsonx.ai model ready: %s @ %s", model_id, WATSONX_URL)
+        return model
 
     except Exception as exc:
-        logger.error("Watsonx.ai init failed: %s", exc)
+        logger.error("Watsonx.ai init failed for %s: %s", model_id, exc)
         return None
-
 
 # ============================================================
 #  WATSONX.AI — chat helper
 # ============================================================
-SYSTEM_PROMPT = get_system_prompt()
-
-
 def _build_messages(
     user_message: str,
     history: list[dict],
     profile: dict | None = None,
+    language: str = "English",
+    budget_friendly: bool = False,
 ) -> list[dict]:
     """
     Build the messages list for ModelInference.chat().
-
-    Format (OpenAI-compatible, accepted by Watsonx.ai chat API):
-        [
-            {"role": "system",    "content": "..."},
-            {"role": "user",      "content": "..."},
-            {"role": "assistant", "content": "..."},
-            ...
-            {"role": "user",      "content": "<current message>"},
-        ]
     """
-    system_content = SYSTEM_PROMPT
+    system_content = get_system_prompt()
+
+    # Apply Budget Friendly rules if active
+    if budget_friendly:
+        system_content += (
+            "\n\n### CRITICAL BUDGET-FRIENDLY DIRECTIVE (SOCIO-ECONOMIC AID):\n"
+            "The user requires a budget-friendly/affordable nutrition approach. "
+            "DO NOT recommend premium, expensive, or imported foods like olive oil, avocado, quinoa, chia seeds, salmon, kale, or expensive supplements.\n"
+            "Instead, emphasize cheap, highly nutritious local Indian foods:\n"
+            "- Healthy fats: local mustard oil, peanut oil, simple curd/dahi.\n"
+            "- Proteins: Sattu (roasted gram flour - poor man's protein), boiled chana, roasted peanuts, sprouts, dal, local eggs, seasonal low-cost vegetables.\n"
+            "- Grains: Millets (ragi/nachni, jowar, bajra), brown/white rice, whole wheat roti.\n"
+            "- Superfoods: Amla (cheap source of Vitamin C), turmeric, ginger, moringa/drumsticks.\n"
+            "Focus on practicality and affordability."
+        )
+
+    # Apply Language instructions if active
+    if language and language.strip().lower() != "english":
+        system_content += (
+            f"\n\n### LANGUAGE DIRECTIVE:\n"
+            f"You MUST generate your entire response (including recipes, meal plans, calories, and instructions) in the {language} language.\n"
+            f"Translate your friendly persona and technical content naturally. For Indian regional languages (e.g. Hindi, Tamil, Telugu, Marathi), write in their native script (e.g. Devanagari for Hindi: हिंदी)."
+        )
 
     # Append user-profile context to the system turn when available
     if profile:
@@ -175,21 +238,21 @@ def call_watsonx(
     user_message: str,
     history: list[dict] | None = None,
     profile: dict | None = None,
+    model_id: str = "meta-llama/llama-3-3-70b-instruct",
+    language: str = "English",
+    budget_friendly: bool = False,
 ) -> str:
     """
     Call the Watsonx.ai chat API and return the assistant reply string.
-    Falls back to offline helpers on any error or missing credentials.
     """
-    model = get_model()
+    model = get_model(model_id)
     if model is None:
         return _offline_chat(user_message)
 
-    messages = _build_messages(user_message, history or [], profile)
+    messages = _build_messages(user_message, history or [], profile, language, budget_friendly)
 
     try:
         result = model.chat(messages=messages)
-        # Watsonx chat API returns:
-        #   result["choices"][0]["message"]["content"]
         reply = (
             result
             .get("choices", [{}])[0]
@@ -199,11 +262,11 @@ def call_watsonx(
         )
         if not reply:
             raise ValueError("Empty response from Watsonx.ai")
-        logger.info("Watsonx.ai chat OK (%d chars)", len(reply))
+        logger.info("Watsonx.ai chat OK (%d chars) using %s", len(reply), model_id)
         return reply
 
     except Exception as exc:
-        logger.error("Watsonx.ai chat error: %s", exc)
+        logger.error("Watsonx.ai chat error for %s: %s", model_id, exc)
         return _offline_chat(user_message)
 
 
@@ -322,27 +385,176 @@ def index():
 @app.route("/health")
 def health():
     ai_ready = _credentials_ok()
+    db_status = "connected"
+    try:
+        db.session.execute(db.select(1))
+    except Exception:
+        db_status = "error"
+        
     return jsonify({
-        "status":      "ok",
+        "status":      "ok" if db_status == "connected" else "degraded",
         "app":         "NutriAI Agent",
-        "version":     "1.0.0",
+        "version":     "1.1.0",
         "ai_backend":  "watsonx.ai",
-        "model":       WATSONX_MODEL_ID,
-        "region":      WATSONX_URL,
+        "database":    db_status,
         "ai_ready":    ai_ready,
         "timestamp":   datetime.utcnow().isoformat(),
     })
 
 
 # ============================================================
-#  ROUTES — API
+#  ROUTES — DATABASE SYNC API
+# ============================================================
+
+@app.route("/api/profile", methods=["GET", "POST"])
+def profile_api():
+    if request.method == "GET":
+        profile = UserProfileModel.query.first()
+        if not profile:
+            return jsonify({})
+        return jsonify({
+            "name": profile.name,
+            "age": profile.age,
+            "gender": profile.gender,
+            "weight": profile.weight,
+            "height": profile.height,
+            "goal": profile.goal,
+            "diet_type": profile.diet_type,
+            "health_conditions": profile.health_conditions,
+            "allergies": profile.allergies,
+            "activity": profile.activity,
+            "budget_friendly": profile.budget_friendly,
+            "preferred_language": profile.preferred_language,
+            "selected_model": profile.selected_model
+        })
+    else: # POST
+        body = request.get_json(force=True)
+        profile = UserProfileModel.query.first()
+        if not profile:
+            profile = UserProfileModel()
+            db.session.add(profile)
+        
+        profile.name = body.get("name")
+        profile.age = int(body.get("age")) if body.get("age") else None
+        profile.gender = body.get("gender")
+        profile.weight = float(body.get("weight")) if body.get("weight") else None
+        profile.height = float(body.get("height")) if body.get("height") else None
+        profile.goal = body.get("goal")
+        profile.diet_type = body.get("diet_type")
+        profile.health_conditions = body.get("health_conditions")
+        profile.allergies = body.get("allergies")
+        profile.activity = body.get("activity")
+        profile.budget_friendly = bool(body.get("budget_friendly"))
+        profile.preferred_language = body.get("preferred_language", "English")
+        profile.selected_model = body.get("selected_model", "meta-llama/llama-3-3-70b-instruct")
+        
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Profile updated successfully"})
+
+
+@app.route("/api/family-members", methods=["GET", "POST"])
+def family_members_api():
+    if request.method == "GET":
+        members = FamilyMemberModel.query.all()
+        return jsonify([{
+            "id": m.id,
+            "name": m.name,
+            "relation": m.relation,
+            "age": m.age,
+            "gender": m.gender,
+            "weight": m.weight,
+            "height": m.height,
+            "goal": m.goal,
+            "activity": m.activity,
+            "conditions": m.conditions
+        } for m in members])
+    else: # POST
+        body = request.get_json(force=True)
+        m = FamilyMemberModel(
+            name=body.get("name"),
+            relation=body.get("relation"),
+            age=int(body.get("age")) if body.get("age") else None,
+            gender=body.get("gender"),
+            weight=float(body.get("weight")) if body.get("weight") else None,
+            height=float(body.get("height")) if body.get("height") else None,
+            goal=body.get("goal"),
+            activity=body.get("activity"),
+            conditions=body.get("conditions")
+        )
+        db.session.add(m)
+        db.session.commit()
+        return jsonify({"status": "success", "id": m.id})
+
+
+@app.route("/api/family-members/<int:member_id>", methods=["DELETE"])
+def delete_family_member(member_id):
+    m = db.session.get(FamilyMemberModel, member_id)
+    if not m:
+        return jsonify({"error": "Member not found"}), 404
+    db.session.delete(m)
+    db.session.commit()
+    return jsonify({"status": "success"})
+
+
+@app.route("/api/chat-history", methods=["GET", "DELETE"])
+def chat_history_api():
+    if request.method == "GET":
+        messages = ChatMessageModel.query.order_by(ChatMessageModel.timestamp.asc()).all()
+        return jsonify([{
+            "role": m.role,
+            "content": m.content,
+            "timestamp": m.timestamp.isoformat()
+        } for m in messages])
+    else: # DELETE
+        ChatMessageModel.query.delete()
+        db.session.commit()
+        return jsonify({"status": "success"})
+
+
+@app.route("/api/weight-logs", methods=["GET", "POST"])
+def weight_logs_api():
+    if request.method == "GET":
+        logs = WeightLogModel.query.order_by(WeightLogModel.log_date.asc()).all()
+        return jsonify([{
+            "id": l.id,
+            "weight": l.weight,
+            "bmi": l.bmi,
+            "date": l.log_date.isoformat()
+        } for l in logs])
+    else: # POST
+        body = request.get_json(force=True)
+        try:
+            w = float(body.get("weight"))
+            h = float(body.get("height"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Invalid weight or height"}), 400
+        
+        bmi_info = calculate_bmi(w, h)
+        if "error" in bmi_info:
+            return jsonify({"error": bmi_info["error"]}), 400
+            
+        log = WeightLogModel(weight=w, bmi=bmi_info["bmi"])
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({
+            "status": "success",
+            "log": {
+                "id": log.id,
+                "weight": log.weight,
+                "bmi": log.bmi,
+                "date": log.log_date.isoformat()
+            }
+        })
+
+
+# ============================================================
+#  ROUTES — AI NUTRITION API
 # ============================================================
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
     """
     Conversational endpoint.
-    Body: { "message": str, "history": list[dict], "profile": dict }
     """
     body    = request.get_json(force=True)
     message = (body.get("message") or "").strip()
@@ -353,9 +565,32 @@ def chat():
 
     history = body.get("history") or []
     profile = body.get("profile") or {}
+    
+    # Dynamic parameter overrides
+    selected_model = profile.get("selected_model", "meta-llama/llama-3-3-70b-instruct")
+    language = profile.get("preferred_language", "English")
+    budget_friendly = profile.get("budget_friendly", False)
 
     try:
-        reply = call_watsonx(message, history=history, profile=profile)
+        # Save user message to database
+        user_msg = ChatMessageModel(role="user", content=message)
+        db.session.add(user_msg)
+        db.session.commit()
+
+        reply = call_watsonx(
+            message,
+            history=history,
+            profile=profile,
+            model_id=selected_model,
+            language=language,
+            budget_friendly=budget_friendly
+        )
+
+        # Save assistant message to database
+        ai_msg = ChatMessageModel(role="assistant", content=reply)
+        db.session.add(ai_msg)
+        db.session.commit()
+
         return jsonify({"response": reply, "timestamp": datetime.utcnow().isoformat()})
     except Exception as exc:
         logger.error("Chat route error: %s", exc)
@@ -364,9 +599,6 @@ def chat():
 
 @app.route("/api/bmi", methods=["POST"])
 def bmi_route():
-    """
-    Body: { "weight_kg": float, "height_cm": float }
-    """
     body = request.get_json(force=True)
     try:
         weight = float(body.get("weight_kg", 0))
@@ -380,9 +612,6 @@ def bmi_route():
 
 @app.route("/api/calories", methods=["POST"])
 def calories_route():
-    """
-    Body: { "weight_kg", "height_cm", "age", "gender", "activity", "goal" }
-    """
     body = request.get_json(force=True)
     try:
         weight   = float(body.get("weight_kg", 0))
@@ -402,10 +631,6 @@ def calories_route():
 
 @app.route("/api/meal-plan", methods=["POST"])
 def meal_plan_route():
-    """
-    Body: { "profile": dict, "days": int, "preferences": str }
-    Uses Watsonx.ai chat API for a personalised Indian meal plan.
-    """
     body        = request.get_json(force=True)
     profile     = body.get("profile") or {}
     days        = min(int(body.get("days", 7)), 7)
@@ -419,6 +644,10 @@ def meal_plan_route():
     goal   = profile.get("goal",   "maintenance")
     diet   = profile.get("diet_type",         "balanced vegetarian")
     health = profile.get("health_conditions", "none")
+
+    selected_model = profile.get("selected_model", "meta-llama/llama-3-3-70b-instruct")
+    language = profile.get("preferred_language", "English")
+    budget_friendly = profile.get("budget_friendly", False)
 
     prompt = (
         f"Create a detailed {days}-day personalised Indian meal plan for:\n"
@@ -437,7 +666,14 @@ def meal_plan_route():
     )
 
     try:
-        reply = call_watsonx(prompt, history=[], profile=profile)
+        reply = call_watsonx(
+            prompt,
+            history=[],
+            profile=profile,
+            model_id=selected_model,
+            language=language,
+            budget_friendly=budget_friendly
+        )
         return jsonify({"meal_plan": reply, "days": days, "timestamp": datetime.utcnow().isoformat()})
     except Exception as exc:
         logger.error("Meal plan error: %s", exc)
@@ -446,10 +682,6 @@ def meal_plan_route():
 
 @app.route("/api/family-plan", methods=["POST"])
 def family_plan_route():
-    """
-    Body: { "members": list[dict] }
-    Each member: { name, age, gender, weight, height, goal, conditions }
-    """
     body    = request.get_json(force=True)
     members = body.get("members") or []
 
@@ -457,6 +689,10 @@ def family_plan_route():
         return jsonify({"error": "No family members provided"}), 400
     if len(members) > 8:
         return jsonify({"error": "Maximum 8 family members supported"}), 400
+
+    selected_model = body.get("selected_model", "meta-llama/llama-3-3-70b-instruct")
+    language = body.get("preferred_language", "English")
+    budget_friendly = body.get("budget_friendly", False)
 
     member_lines = "\n".join(
         f"- {m.get('name', f'Member {i+1}')}: "
@@ -480,7 +716,13 @@ def family_plan_route():
     )
 
     try:
-        reply = call_watsonx(prompt, history=[])
+        reply = call_watsonx(
+            prompt,
+            history=[],
+            model_id=selected_model,
+            language=language,
+            budget_friendly=budget_friendly
+        )
         return jsonify({"family_plan": reply, "member_count": len(members), "timestamp": datetime.utcnow().isoformat()})
     except Exception as exc:
         logger.error("Family plan error: %s", exc)
@@ -489,14 +731,14 @@ def family_plan_route():
 
 @app.route("/api/analyze-food", methods=["POST"])
 def analyze_food_route():
-    """
-    Body: { "food_description": str }
-    Returns nutritional analysis via Watsonx.ai.
-    """
     body = request.get_json(force=True)
     food = (body.get("food_description") or "").strip()
     if not food:
         return jsonify({"error": "food_description is required"}), 400
+
+    selected_model = body.get("selected_model", "meta-llama/llama-3-3-70b-instruct")
+    language = body.get("preferred_language", "English")
+    budget_friendly = body.get("budget_friendly", False)
 
     prompt = (
         f'Analyse the nutritional content of: "{food}"\n\n'
@@ -511,11 +753,62 @@ def analyze_food_route():
     )
 
     try:
-        reply = call_watsonx(prompt, history=[])
+        reply = call_watsonx(
+            prompt,
+            history=[],
+            model_id=selected_model,
+            language=language,
+            budget_friendly=budget_friendly
+        )
         return jsonify({"analysis": reply, "food": food, "timestamp": datetime.utcnow().isoformat()})
     except Exception as exc:
         logger.error("Food analysis error: %s", exc)
         return jsonify({"error": "Failed to analyse food"}), 500
+
+
+@app.route("/api/generate-recipe", methods=["POST"])
+def generate_recipe_api():
+    body = request.get_json(force=True)
+    ingredients = (body.get("ingredients") or "").strip()
+    profile = body.get("profile") or {}
+    
+    if not ingredients:
+        return jsonify({"error": "Ingredients are required"}), 400
+
+    selected_model = profile.get("selected_model", "meta-llama/llama-3-3-70b-instruct")
+    language = profile.get("preferred_language", "English")
+    budget_friendly = profile.get("budget_friendly", False)
+
+    prompt = (
+        f"Generate a healthy, delicious, and personalized Indian recipe using the following ingredients from my pantry:\n"
+        f"Ingredients: {ingredients}\n\n"
+        f"User Details:\n"
+        f"- Goal: {profile.get('goal', 'maintenance')}\n"
+        f"- Diet Type: {profile.get('diet_type', 'balanced')}\n"
+        f"- Health conditions: {profile.get('health_conditions', 'none')}\n"
+        f"- Allergies: {profile.get('allergies', 'none')}\n\n"
+        f"Provide the output in the following structure:\n"
+        f"1. Recipe Name\n"
+        f"2. Prep time & Cook time\n"
+        f"3. Ingredients list with exact quantities\n"
+        f"4. Step-by-step preparation steps\n"
+        f"5. Nutritional breakdown (estimated calories, protein, carbs, fats)\n"
+        f"6. Why this is good for the user's specific health goals."
+    )
+
+    try:
+        reply = call_watsonx(
+            prompt,
+            history=[],
+            profile=profile,
+            model_id=selected_model,
+            language=language,
+            budget_friendly=budget_friendly
+        )
+        return jsonify({"recipe": reply, "timestamp": datetime.utcnow().isoformat()})
+    except Exception as exc:
+        logger.error("Recipe generation error: %s", exc)
+        return jsonify({"error": "Failed to generate recipe"}), 500
 
 
 # ============================================================
@@ -526,7 +819,7 @@ if __name__ == "__main__":
     logger.info("=" * 60)
     logger.info("  NutriAI Agent")
     logger.info("  URL      : http://127.0.0.1:%s", FLASK_PORT)
-    logger.info("  Model    : %s", WATSONX_MODEL_ID)
+    logger.info("  Model    : %s", "meta-llama/llama-3-3-70b-instruct")
     logger.info("  Region   : %s", WATSONX_URL)
     logger.info("  AI status: %s", ai_status)
     logger.info("=" * 60)
@@ -535,3 +828,4 @@ if __name__ == "__main__":
         port=FLASK_PORT,
         debug=os.getenv("FLASK_DEBUG", "True").lower() == "true",
     )
+
