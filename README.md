@@ -12,6 +12,7 @@
 
 ---
 
+LIVE DEMO - https://nutrition-agent-5wvf.onrender.com/
 ## ✨ Features
 
 | Feature | Description |
@@ -139,84 +140,14 @@ and make healthy eating feel exciting and achievable...
 """
 ```
 
----
 
-## 🌐 API Reference
 
-All endpoints return JSON. Frontend JavaScript calls these automatically.
 
-### `POST /api/chat`
-Conversational AI chat.
-```json
-Request:  { "message": "...", "history": [...], "profile": {...} }
-Response: { "response": "...", "timestamp": "..." }
-```
 
-### `POST /api/bmi`
-Calculate BMI.
-```json
-Request:  { "weight_kg": 70, "height_cm": 170 }
-Response: { "bmi": 24.2, "category": "Normal Weight", "advice": "..." }
-```
 
-### `POST /api/calories`
-Calculate daily calorie needs.
-```json
-Request:  { "weight_kg": 70, "height_cm": 170, "age": 30,
-            "gender": "male", "activity": "moderate", "goal": "lose" }
-Response: { "bmr": 1750, "tdee": 2712, "target_calories": 2312,
-            "protein_g": 156, "carbs_g": 260, "fats_g": 72 }
-```
 
-### `POST /api/meal-plan`
-Generate AI meal plan.
-```json
-Request:  { "profile": {...}, "days": 7, "preferences": "..." }
-Response: { "meal_plan": "...", "days": 7 }
-```
 
-### `POST /api/family-plan`
-Generate family nutrition plan.
-```json
-Request:  { "members": [{ "name": "Rahul", "age": 35, ... }] }
-Response: { "family_plan": "...", "member_count": 4 }
-```
 
-### `POST /api/analyze-food`
-Analyze food nutritional content.
-```json
-Request:  { "food_description": "2 idli with sambhar" }
-Response: { "analysis": "...", "food": "..." }
-```
-
-### `GET /health`
-Health check / status.
-```json
-Response: { "status": "ok", "watsonx_model": "configured" }
-```
-
----
-
-## 🐳 Docker Deployment
-
-```bash
-# Create a Dockerfile
-cat > Dockerfile << 'EOF'
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]
-EOF
-
-# Build and run
-docker build -t nutriai-agent .
-docker run -p 5000:5000 --env-file .env nutriai-agent
-```
-
----
 
 ## ☁️ IBM Cloud Code Engine Deployment
 
@@ -240,27 +171,8 @@ ibmcloud ce app create \
 
 ---
 
-## 🔒 Security Notes
 
-- `.env` is listed in `.gitignore` — never commit it
-- In production, set `FLASK_DEBUG=False`
-- Change `FLASK_SECRET_KEY` to a cryptographically random value:
-  ```python
-  python -c "import secrets; print(secrets.token_hex(32))"
-  ```
-- Use environment variables or IBM Secrets Manager in production — not `.env` files
 
----
-
-## 🐛 Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| `IBM_CLOUD_API_KEY not configured` | Edit `.env` and add your real key |
-| `Failed to initialize Watsonx.ai` | Check your Project ID and API key; verify Watsonx is enabled in your region |
-| `ModuleNotFoundError: ibm_watsonx_ai` | Run `pip install -r requirements.txt` in your virtual env |
-| App shows fallback responses | AI works in demo mode without a key — configure `.env` for full AI |
-| Port already in use | Change `FLASK_PORT=5001` in `.env` |
 
 ---
 
@@ -293,6 +205,8 @@ See [LICENSE](LICENSE) file for details.
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Krushna%20Donge-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/krushna9506?utm_source=share_via&utm_content=profile&utm_medium=member_ios)
 [![GitHub](https://img.shields.io/badge/GitHub-krushna9506-181717?logo=github)](https://github.com/krushna9506)
+
+
 
 ---
 
